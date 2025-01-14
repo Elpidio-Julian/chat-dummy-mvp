@@ -39,3 +39,12 @@ package-lock.json
 # Cursor
 .cursorignore
 .cursorrules
+
+# rag stuff
+/src/rag/venv/*
+/src/rag/venv
+/src/rag/credentials/
+
+# cache
+.cache
+__pycache__
