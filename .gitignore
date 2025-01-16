@@ -49,3 +49,6 @@ package-lock.json
 # cache
 .cache
 __pycache__
+
+# vite build
+dist

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from contextual_response import ContextualResponseGenerator
+from bot_service import send_bot_response
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -28,6 +29,7 @@ class QueryRequest(BaseModel):
     query: str = Field(..., description="The user's question")
     max_context: Optional[int] = Field(5, description="Maximum number of context messages to include")
     use_cache: Optional[bool] = Field(True, description="Whether to use response caching")
+    send_to_chat: Optional[bool] = Field(False, description="Whether to send the response to chat")
 
 class Message(BaseModel):
     """Model for chat messages."""
@@ -75,6 +77,7 @@ async def query(request: QueryRequest):
             - query: The user's question
             - max_context: Maximum number of context messages (optional)
             - use_cache: Whether to use caching (optional)
+            - send_to_chat: Whether to send response to chat (optional)
     
     Returns:
         QueryResponse: The response containing:
@@ -90,6 +93,15 @@ async def query(request: QueryRequest):
             max_context=request.max_context,
             use_cache=request.use_cache
         )
+        
+        # If requested, send the response to chat
+        if request.send_to_chat:
+            try:
+                send_bot_response(request.query, response['answer'])
+            except Exception as e:
+                print(f"Warning: Failed to send message to chat: {e}")
+                # Continue with the API response even if chat message fails
+        
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

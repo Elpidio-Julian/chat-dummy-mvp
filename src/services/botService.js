@@ -20,7 +20,10 @@ import {
     orderBy,
     limit,
     Timestamp,
-    connectFirestoreEmulator
+    connectFirestoreEmulator,
+    doc,
+    updateDoc,
+    runTransaction
 } from 'firebase/firestore';
 import { queryRagApi } from './ragApi';
 
@@ -159,6 +162,56 @@ export const processBotQuery = async (message, messageId) => {
 };
 
 /**
+ * Try to claim a message for processing
+ * @param {string} channelId - The channel ID
+ * @param {string} messageId - The message ID
+ * @returns {Promise<boolean>} Whether the claim was successful
+ */
+const tryClaimMessage = async (channelId, messageId) => {
+    try {
+        const messageRef = doc(botDb, 'messages', channelId, 'messages', messageId);
+        
+        // Try to update the message with processing status
+        const result = await runTransaction(botDb, async (transaction) => {
+            const messageDoc = await transaction.get(messageRef);
+            if (!messageDoc.exists()) return false;
+            
+            const messageData = messageDoc.data();
+            if (messageData.isProcessed || messageData.isProcessing) return false;
+            
+            transaction.update(messageRef, {
+                isProcessing: true,
+                processingStartedAt: serverTimestamp()
+            });
+            return true;
+        });
+        
+        return result;
+    } catch (error) {
+        console.error('Error claiming message:', error);
+        return false;
+    }
+};
+
+/**
+ * Mark a message as processed
+ * @param {string} channelId - The channel ID
+ * @param {string} messageId - The message ID
+ */
+const markMessageProcessed = async (channelId, messageId) => {
+    try {
+        const messageRef = doc(botDb, 'messages', channelId, 'messages', messageId);
+        await updateDoc(messageRef, {
+            isProcessed: true,
+            isProcessing: false,
+            processedAt: serverTimestamp()
+        });
+    } catch (error) {
+        console.error('Error marking message as processed:', error);
+    }
+};
+
+/**
  * Start listening for messages in the help channel
  * @returns {Function} Unsubscribe function
  */
@@ -192,13 +245,23 @@ export const startBotMessageListener = async () => {
                         const messageId = change.doc.id;
                         const message = change.doc.data();
                         
-                        // Check if message starts with "Hey Chatbot" and isn't from the bot
                         if (
                             message.content.toLowerCase().startsWith('hey chatbot') &&
                             message.userId !== BOT_USER_ID &&
-                            !message.content.includes('_Thinking..._') // Ignore typing indicators
+                            !message.content.includes('_Thinking..._') && // Ignore typing indicators
+                            !message.isProcessed && // Skip if already processed
+                            !message.isProcessing // Skip if being processed
                         ) {
-                            await processBotQuery(message, messageId);
+                            // Try to claim the message for processing
+                            const claimed = await tryClaimMessage('help', messageId);
+                            if (claimed) {
+                                try {
+                                    await processBotQuery(message, messageId);
+                                    await markMessageProcessed('help', messageId);
+                                } catch (error) {
+                                    console.error('Error processing message:', error);
+                                }
+                            }
                         }
                     }
                 }
