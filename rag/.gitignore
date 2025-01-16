@@ -41,10 +41,10 @@ package-lock.json
 .cursorrules
 
 # rag stuff
-/rag/venv/*
-/rag/venv
-/rag/venv/lib/*
-/rag/credentials/
+venv/*
+venv
+venv/lib/*
+credentials/
 
 # cache
 .cache
