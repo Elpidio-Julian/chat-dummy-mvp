@@ -3,7 +3,7 @@
  * Handles communication with the local RAG API endpoint
  */
 
-const API_URL = import.meta.env.VITE_RAG_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_RAG_API_URL || 'ttps://traditional-dory-elpidio-dev-44af094d.koyeb.app';
 
 /**
  * Send a query to the RAG API
