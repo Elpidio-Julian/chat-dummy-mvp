@@ -51,7 +51,7 @@ package-lock.json
 __pycache__
 
 # vite build
-dist
+dist/assets/*
 
 # firebase functions stuff
 /functions/venv/*
