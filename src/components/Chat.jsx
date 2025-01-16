@@ -1,10 +1,34 @@
+import { useEffect } from 'react';
 import { useChannel } from '../contexts/ChannelContext';
 import ChannelList from './ChannelList';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
+import { startBotMessageListener } from '../services/botService';
 
 export default function Chat() {
   const { selectedChannel } = useChannel();
+
+  useEffect(() => {
+    let unsubscribe;
+
+    // Start the bot message listener
+    const setupListener = async () => {
+      try {
+        unsubscribe = await startBotMessageListener();
+      } catch (error) {
+        console.error('Error starting bot message listener:', error);
+      }
+    };
+
+    setupListener();
+    
+    // Cleanup on unmount
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, []); // Empty dependency array means this runs once on mount
 
   return (
     <div className="min-h-[calc(100vh-4rem)] min-w-screen bg-gray-900 flex">

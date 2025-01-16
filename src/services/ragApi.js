@@ -11,10 +11,17 @@ const API_URL = import.meta.env.VITE_RAG_API_URL || 'http://localhost:8000';
  * @param {Object} options - Additional options
  * @param {number} options.maxContext - Maximum number of context messages (default: 5)
  * @param {boolean} options.useCache - Whether to use response caching (default: true)
+ * @param {boolean} options.sendToChat - Whether to send response to chat (default: false)
+ * @param {string} options.channelId - The channel ID to send the response to (default: 'help')
  * @returns {Promise<Object>} The API response
  */
 export const queryRagApi = async (query, options = {}) => {
-    const { maxContext = 5, useCache = true } = options;
+    const { 
+        maxContext = 5, 
+        useCache = true, 
+        sendToChat = false,
+        channelId = 'help'
+    } = options;
 
     try {
         const response = await fetch(`${API_URL}/query`, {
@@ -25,7 +32,9 @@ export const queryRagApi = async (query, options = {}) => {
             body: JSON.stringify({
                 query,
                 max_context: maxContext,
-                use_cache: useCache
+                use_cache: useCache,
+                send_to_chat: sendToChat,
+                channel_id: channelId
             })
         });
 

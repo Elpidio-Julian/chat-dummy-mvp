@@ -3,8 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from contextual_response import ContextualResponseGenerator
-from bot_service import send_bot_response
-
+from bot_service import handle_query_response
 # Initialize FastAPI app
 app = FastAPI(
     title="RAG Chat API",
@@ -30,6 +29,7 @@ class QueryRequest(BaseModel):
     max_context: Optional[int] = Field(5, description="Maximum number of context messages to include")
     use_cache: Optional[bool] = Field(True, description="Whether to use response caching")
     send_to_chat: Optional[bool] = Field(False, description="Whether to send the response to chat")
+    channel_id: Optional[str] = Field('help', description="The channel ID to send the response to")
 
 class Message(BaseModel):
     """Model for chat messages."""
@@ -67,7 +67,7 @@ async def root():
         ]
     }
 
-@app.post("/query", response_model=QueryResponse)
+@app.post("/query")
 async def query(request: QueryRequest):
     """
     Get a contextual response for a query.
@@ -78,16 +78,13 @@ async def query(request: QueryRequest):
             - max_context: Maximum number of context messages (optional)
             - use_cache: Whether to use caching (optional)
             - send_to_chat: Whether to send response to chat (optional)
+            - channel_id: The channel ID to send the response to (optional)
     
     Returns:
-        QueryResponse: The response containing:
-            - answer: The generated response
-            - context: List of relevant messages used
-            - timestamp: When the response was generated
-            - query: The original query
-            - cached: Whether this was a cached response
+        dict: The response containing the answer and context
     """
     try:
+        print(f"Received query request: {request}")
         response = response_generator.generate_response(
             query=request.query,
             max_context=request.max_context,
@@ -97,13 +94,15 @@ async def query(request: QueryRequest):
         # If requested, send the response to chat
         if request.send_to_chat:
             try:
-                send_bot_response(request.query, response['answer'])
+                print(f"Sending response to chat in channel: {request.channel_id}")
+                handle_query_response(request.query, response['answer'], channel_id=request.channel_id)
             except Exception as e:
                 print(f"Warning: Failed to send message to chat: {e}")
                 # Continue with the API response even if chat message fails
         
         return response
     except Exception as e:
+        print(f"Error processing query: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/cache/stats", response_model=CacheStats)

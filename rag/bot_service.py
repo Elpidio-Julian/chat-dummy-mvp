@@ -2,7 +2,7 @@ import os
 import time
 import firebase_admin
 from firebase_admin import credentials, firestore
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Initialize Firebase Admin with service account
 cred = credentials.Certificate('credentials/firebase-credentials.json')
@@ -12,61 +12,78 @@ db = firestore.client()
 # Constants
 HELP_CHANNEL_ID = 'help'
 BOT_USER_ID = os.getenv('BOT_USER_ID')
-PROCESSED_MESSAGES = set()
 
 def send_bot_message(content, channel_id=HELP_CHANNEL_ID):
     """Send a message as the bot."""
     try:
+        print(f"Attempting to send bot message: {content}")
         messages_ref = db.collection('messages').document(channel_id).collection('messages')
         messages_ref.add({
             'content': content,
             'userId': BOT_USER_ID,
             'userName': 'RAG Assistant',
-            'createdAt': datetime.now(),
+            'createdAt': firestore.SERVER_TIMESTAMP,
             'isBot': True
         })
+        print("Successfully sent bot message")
+        return True
     except Exception as e:
         print(f"Error sending bot message: {e}")
         raise e
 
-def send_bot_response(query, response):
-    """Send a bot response for a query."""
+def handle_query_response(query, response, channel_id=HELP_CHANNEL_ID):
+    """Handle a query response by sending messages and updating status."""
     try:
-        # Send typing indicator
-        send_bot_message("_Thinking..._")
+        print(f"Handling query response for: {query}")
+        # Get the message reference for the query
+        messages_ref = db.collection('messages').document(channel_id).collection('messages')
         
-        # Send the actual response
-        send_bot_message(response)
+        # Get messages from the last 5 minutes
+        five_minutes_ago = datetime.now() - timedelta(minutes=5)
+        query_messages = messages_ref.where('createdAt', '>=', five_minutes_ago).get()
+        
+        message_sent = False
+        print("Checking messages...")
+        for msg in query_messages:
+            message_data = msg.to_dict()
+            print(f"Checking message: {message_data.get('content', '')}")
+            # Check if this is the message we want to respond to
+            if (message_data.get('content', '').lower().startswith('hey chatbot') and
+                not message_data.get('isProcessed', False) and
+                not message_data.get('isProcessing', False)):
+                
+                print("Found matching message, sending response...")
+                # Mark as processing
+                msg.reference.update({
+                    'isProcessing': True,
+                    'processingStartedAt': firestore.SERVER_TIMESTAMP
+                })
+                
+                # Send typing indicator
+                send_bot_message("_Thinking..._")
+                time.sleep(1)  # Brief pause to show typing indicator
+                
+                # Send the actual response
+                send_bot_message(response)
+                
+                # Mark as processed
+                msg.reference.update({
+                    'isProcessed': True,
+                    'isProcessing': False,
+                    'processedAt': firestore.SERVER_TIMESTAMP
+                })
+                
+                message_sent = True
+                print("Response sent and message marked as processed")
+                break
+        
+        # If no matching message found, just send the response
+        if not message_sent:
+            print("No matching message found, sending direct response")
+            send_bot_message(response)
+                
     except Exception as e:
-        print(f"Error sending bot response: {e}")
-        send_bot_message("Sorry, I encountered an error processing your request. Please try again later.")
-
-def process_message(message_id, message_data):
-    """Process a single message and generate bot response."""
-    if message_id in PROCESSED_MESSAGES:
-        return
-    
-    PROCESSED_MESSAGES.add(message_id)
-    
-    # Cleanup old message IDs (keep last 1000)
-    if len(PROCESSED_MESSAGES) > 1000:
-        PROCESSED_MESSAGES.clear()
-        PROCESSED_MESSAGES.add(message_id)
-    
-    try:
-        # Send typing indicator
-        send_bot_message("_Thinking..._")
-        
-        # Extract query (remove "Hey Chatbot" prefix)
-        query = message_data['content'][11:].strip()
-        
-        # Get response from RAG API
-        response = query_rag(query)
-        
-        # Send response
-        send_bot_message(response['answer'])
-    except Exception as e:
-        print(f"Error processing message: {e}")
+        print(f"Error handling query response: {e}")
         send_bot_message("Sorry, I encountered an error processing your request. Please try again later.")
 
 def on_snapshot(doc_snapshot, changes, read_time):
@@ -78,8 +95,14 @@ def on_snapshot(doc_snapshot, changes, read_time):
             # Check if message starts with "Hey Chatbot" and isn't from the bot
             if (message_data.get('content', '').lower().startswith('hey chatbot') and
                 message_data.get('userId') != BOT_USER_ID and
-                '_Thinking..._' not in message_data.get('content', '')):
-                process_message(change.document.id, message_data)
+                not message_data.get('isProcessed', False) and
+                not message_data.get('isProcessing', False)):
+                
+                # Extract query (remove "Hey Chatbot" prefix)
+                query = message_data['content'][11:].strip()
+                
+                # Send response directly
+                handle_query_response(query, f"I received your query: {query}")
 
 def main():
     """Main bot service function."""
