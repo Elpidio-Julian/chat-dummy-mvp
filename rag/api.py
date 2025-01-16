@@ -121,3 +121,16 @@ async def clear_cache():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000) 
+
+
+
+
+
+
+
+
+
+
+    # curl -X POST "http://localhost:8000/query" \
+    #  -H "Content-Type: application/json" \
+    #  -d '{"query": "What are some recommended VS Code extensions?"}'

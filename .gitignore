@@ -41,9 +41,9 @@ package-lock.json
 .cursorrules
 
 # rag stuff
-/src/rag/venv/*
-/src/rag/venv
-/src/rag/credentials/
+/rag/venv/*
+/rag/venv
+/rag/credentials/
 
 # cache
 .cache

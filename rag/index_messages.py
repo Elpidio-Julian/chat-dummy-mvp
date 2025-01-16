@@ -14,8 +14,8 @@ from time import time, sleep
 last_call_time = time()
 
 # Load environment variables with explicit path
-base_path = Path(__file__).parent  # Gets the directory containing this script
-env_path = base_path / '.env'
+# base_path = Path(__file__).parent  # Gets the directory containing this script
+env_path = '../.env'
 print(f"Looking for .env at: {env_path}")
 load_dotenv(dotenv_path=env_path)
 
