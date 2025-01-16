@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from contextual_response import ContextualResponseGenerator
-from bot_service import handle_query_response
+from bot_service import handle_query_response, HELP_CHANNEL_ID
+
 # Initialize FastAPI app
 app = FastAPI(
     title="RAG Chat API",
@@ -29,43 +30,7 @@ class QueryRequest(BaseModel):
     max_context: Optional[int] = Field(5, description="Maximum number of context messages to include")
     use_cache: Optional[bool] = Field(True, description="Whether to use response caching")
     send_to_chat: Optional[bool] = Field(False, description="Whether to send the response to chat")
-    channel_id: Optional[str] = Field('help', description="The channel ID to send the response to")
-
-class Message(BaseModel):
-    """Model for chat messages."""
-    content: str
-    channel_id: str
-    user_name: str
-    timestamp: str
-    message_id: str
-
-class QueryResponse(BaseModel):
-    """Response model for query endpoint."""
-    answer: str
-    context: List[Dict[str, Any]]
-    timestamp: str
-    query: str
-    cached: bool
-
-class CacheStats(BaseModel):
-    """Model for cache statistics."""
-    hits: int
-    misses: int
-    expired: int
-    errors: int
-
-@app.get("/")
-async def root():
-    """Root endpoint with API information."""
-    return {
-        "name": "RAG Chat API",
-        "version": "1.0.0",
-        "endpoints": [
-            "/query - Get contextual responses",
-            "/cache/stats - Get cache statistics",
-            "/cache/clear - Clear expired cache entries"
-        ]
-    }
+    channel_id: Optional[str] = Field(HELP_CHANNEL_ID, description="The channel ID to send the response to")
 
 @app.post("/query")
 async def query(request: QueryRequest):
@@ -84,7 +49,15 @@ async def query(request: QueryRequest):
         dict: The response containing the answer and context
     """
     try:
-        print(f"Received query request: {request}")
+        print(f"Processing query: {request.query}")
+        
+        # If sending to chat, validate channel
+        if request.send_to_chat and request.channel_id != HELP_CHANNEL_ID:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Bot responses are only available in the help channel"
+            )
+            
         response = response_generator.generate_response(
             query=request.query,
             max_context=request.max_context,
@@ -101,42 +74,10 @@ async def query(request: QueryRequest):
                 # Continue with the API response even if chat message fails
         
         return response
+    except HTTPException as he:
+        raise he
     except Exception as e:
         print(f"Error processing query: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/cache/stats", response_model=CacheStats)
-async def get_cache_stats():
-    """
-    Get current cache statistics.
-    
-    Returns:
-        CacheStats: Current cache statistics including:
-            - hits: Number of cache hits
-            - misses: Number of cache misses
-            - expired: Number of expired entries encountered
-            - errors: Number of cache errors
-    """
-    try:
-        return response_generator.get_cache_stats()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/cache/clear")
-async def clear_cache():
-    """
-    Clear expired cache entries.
-    
-    Returns:
-        dict: Information about the cleanup operation
-    """
-    try:
-        cleared_count, stats = response_generator.clear_cache()
-        return {
-            "cleared_entries": cleared_count,
-            "current_stats": stats
-        }
-    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

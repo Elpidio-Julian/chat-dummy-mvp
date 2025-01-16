@@ -2,11 +2,17 @@ import { useState } from 'react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { queryRagApi } from '../services/ragApi';
+
+// Constants
+const HELP_CHANNEL_ID = 'help';
 
 export default function MessageInput({ channelId }) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const { currentUser } = useAuth();
+  
+  const isHelpChannel = channelId === HELP_CHANNEL_ID;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,12 +21,29 @@ export default function MessageInput({ channelId }) {
     try {
       setSending(true);
       const messagesRef = collection(db, 'messages', channelId, 'messages');
+      
+      // Add the message
       await addDoc(messagesRef, {
         content: message.trim(),
         userId: currentUser.uid,
         userName: currentUser.displayName || currentUser.email,
         createdAt: serverTimestamp()
       });
+
+      // If it's a bot command and we're in the help channel, send to RAG API
+      if (isHelpChannel && message.trim().toLowerCase().startsWith('hey chatbot')) {
+        try {
+          // Extract query and send to RAG API
+          const query = message.slice(11).trim();
+          await queryRagApi(query, { 
+            sendToChat: true,
+            channelId: channelId 
+          });
+        } catch (error) {
+          console.error('Error processing bot message:', error);
+        }
+      }
+
       setMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
@@ -36,7 +59,10 @@ export default function MessageInput({ channelId }) {
           type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Type a message..."
+          placeholder={isHelpChannel 
+            ? "Type a message... (Start with 'Hey Chatbot' to ask a question)"
+            : "Type a message..."
+          }
           className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           disabled={sending}
         />

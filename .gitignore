@@ -29,13 +29,13 @@ dist-ssr
 
 # Firestore rules
 firestore.rules 
-
+.firebase/
 # Firebase config
 firebase.json
-
+.firebase/*
 # Package lock
 package-lock.json
-
+.firebase/hosting.ZGlzdA.cache
 # Cursor
 .cursorignore
 .cursorrules
