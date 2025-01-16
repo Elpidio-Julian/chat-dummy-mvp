@@ -8,8 +8,23 @@ import Header from './components/Header';
 import Chat from './components/Chat';
 import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
+import { useEffect } from 'react';
+import { initializeBotService } from './services/botService';
 
 function App() {
+  useEffect(() => {
+    let cleanup;
+    
+    const initBot = async () => {
+      cleanup = await initializeBotService();
+    };
+    
+    initBot();
+    
+    // Cleanup on unmount
+    return () => cleanup && cleanup();
+  }, []);
+
   return (
     <Router>
       <AuthProvider>

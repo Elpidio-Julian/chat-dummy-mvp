@@ -43,6 +43,7 @@ package-lock.json
 # rag stuff
 /rag/venv/*
 /rag/venv
+/rag/venv/lib/*
 /rag/credentials/
 
 # cache
