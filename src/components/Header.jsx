@@ -21,7 +21,7 @@ export default function Header() {
           {/* Logo */}
           <div className="flex items-center">
             <Link to="/" className="text-2xl font-bold text-indigo-600 hover:text-indigo-500">
-              SlackClone
+              Chat-Dummy
             </Link>
           </div>
 
